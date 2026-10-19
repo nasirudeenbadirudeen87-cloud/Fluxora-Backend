@@ -19,7 +19,7 @@ import { fetchExportPage, listStreams } from '../../db/repositories/streamApiQue
 import { PoolExhaustedError } from '../../db/pool.js';
 import { shouldForcePrimaryFromHeaders } from '../../db/writeFencePin.js';
 import { PaginationSchema } from '../../validation/paginationSchema.js';
-import { toStreamJsonLd } from '../../serialization/jsonld.js';
+import { toStreamJsonLd, FLUXORA_JSONLD_CONTEXT } from '../../serialization/jsonld.js';
 import {
   streamCacheControl,
   streamCursorScope,
@@ -31,7 +31,7 @@ import { successResponse } from '../../utils/response.js';
 import { sendEarlyHints } from '../../utils/earlyHints.js';
 import { parseCursorParam } from '../../utils/opaqueCursor.js';
 import { respondNotModified, setValidatorHeaders } from '../../utils/conditionalGet.js';
-import { debug, info, warn } from '../../utils/logger.js';
+import { debug, info, warn } from '../../lib/logger.js';
 import {
   assertCallerMayList,
   enforceStreamScope,
@@ -41,10 +41,12 @@ import {
 } from './guards.js';
 import { isStreamListingHealthy } from './state.js';
 
-const STREAMS_ENHANCED_RESPONSE_FLAG = 'streams_enhanced_response';
+export const STREAMS_ENHANCED_RESPONSE_FLAG = 'streams_enhanced_response';
 const MAX_EXPORT_PAGES = 1000;
+// Derived from FLUXORA_JSONLD_CONTEXT so the advertised URI can never drift
+// from the @context the documents carry or the /ns/v1 endpoint that serves it.
 const JSON_LD_CONTEXT_LINK =
-  '<https://fluxora.dev/ns/v1>; rel="http://www.w3.org/ns/json-ld#context"; type="application/ld+json"';
+  `<${FLUXORA_JSONLD_CONTEXT}>; rel="http://www.w3.org/ns/json-ld#context"; type="application/ld+json"`;
 
 async function timePhase<T>(res: Response, phase: string, operation: () => Promise<T>): Promise<T> {
   const start = process.hrtime.bigint();
@@ -110,7 +112,7 @@ async function listStreamsHandler(req: Request, res: Response): Promise<void> {
     if (sender) queryParams.sender = sender;
     if (recipient) queryParams.recipient = recipient;
     if (includeTotal) queryParams.include_total = 'true';
-    sendEarlyHints(res, { baseUrl: '/api/streams', hasMore: true, nextCursor: body.next_cursor, queryParams });
+    sendEarlyHints(res, { baseUrl: '/api/streams', hasMore: true, nextCursor: body.next_cursor, queryParams }, req);
   }
 
   if (isFlagEnabled(STREAMS_ENHANCED_RESPONSE_FLAG, getFeatureFlagRequesterId(req))) {

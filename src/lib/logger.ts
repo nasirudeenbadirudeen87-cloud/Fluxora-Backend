@@ -1,3 +1,4 @@
+import { getRuntimeEnv } from '../config/runtime-env.js';
 /**
  * Structured JSON logger.
  *
@@ -20,6 +21,13 @@ import { getCorrelationId } from '../tracing/middleware.js';
 import { forwardToOtel } from '../tracing/logsBridge.js';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+/**
+ * Fields that every structured log record must retain for log consumers.
+ * Optional correlation and metadata fields may be added without changing
+ * this compatibility contract.
+ */
+export const LOGGER_CORE_FIELDS = ['timestamp', 'level', 'message'] as const;
 
 export interface LogRecord {
   timestamp: string;
@@ -55,9 +63,9 @@ export function isLogLevel(value: unknown): value is LogLevel {
  * environments default to `debug`, so nothing is silently dropped there.
  */
 function resolveInitialLogLevel(): LogLevel {
-  const configured = process.env.LOG_LEVEL;
+  const configured = getRuntimeEnv().LOG_LEVEL;
   if (isLogLevel(configured)) return configured;
-  return process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging'
+  return getRuntimeEnv().NODE_ENV === 'production' || getRuntimeEnv().NODE_ENV === 'staging'
     ? 'info'
     : 'debug';
 }
@@ -270,4 +278,3 @@ export const logger = {
 };
 
 export type Logger = typeof logger;
-
